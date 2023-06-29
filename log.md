@@ -8,3 +8,17 @@
 
 注意数据的版本不同，课程给出的版本为2015
 本次代码使用的是2017，即CVPR的数据集
+
+# 模型搭建
+目前模型搭建遇到的两个主要困难：
+1. ViT的模型没有可用的，需要自己写
+2. bert的模型不知道是否可用于mindspore中
+
+对于第二个问题，transformer包中的内容并不能
+在mindspore中使用，因此需要重写bert，目前社区有一份bert代码
+不知能否使用
+
+from timm.models.layers import trunc_normal_, DropPath中，DropPath可以直接复制代码平替，前面的那个也可直接复制代码平替
+from timm.models.vision_transformer import _cfg, PatchEmbed中，_cfg可以复制代码平替，PatchEmbed也可以平替
+
+这样第一个模型的问题就解决了
