@@ -12,6 +12,7 @@ import mindspore.dataset as ds
 from mindspore.mindrecord import FileWriter
 from dataset.utils import pre_question
 
+# dataset可能无法正确检索到验证集里的数据，测试如果不成功应修改，修改思路为在yaml文件中将测试集文件和验证集文件的路径拆分
 class VQA_Dataset:
     def __init__(self, ann_file, transform, vqa_root, vg_root, eos='[SEP]', split="train", max_ques_words=30, answer_list=''):
         self.split = split
@@ -71,3 +72,35 @@ class VQA_Dataset:
             answers = [answer + self.eos for answer in answers]
 
             return image, question, answers, weights
+
+if __name__ == '__main__':
+    import argparse
+    import ruamel_yaml as yaml
+    from dataset.randaugment import RandomAugment
+    from mindspore.dataset import vision
+    from PIL import Image
+
+    normalize = vision.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='./configs/VQA.yaml')
+    args = parser.parse_args()
+
+    config = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
+
+
+    train_transform = vision.Compose([
+        vision.RandomResizedCrop(config['image_res'], scale=(0.5, 1.0), interpolation=Image.BICUBIC),
+        vision.RandomHorizontalFlip(),
+        RandomAugment(2, 7, isPIL=True, augs=['Identity', 'AutoContrast', 'Equalize', 'Brightness', 'Sharpness',
+                                              'ShearX', 'ShearY', 'TranslateX', 'TranslateY', 'Rotate']),
+        vision.ToTensor(),
+        normalize,
+    ])
+
+    config = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
+    train_dataset = VQA_Dataset(config['train_file'], train_transform, config['vqa_root'], config['vg_root'],
+                                split='train')
+
+    # 检查dataset是否能够正确检索到数据
+    print(train_dataset[100])
