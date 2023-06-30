@@ -1,11 +1,9 @@
-train_file: ['data/vqa_train.json',
-             'data/vqa_val.json',   
-             'data/vg_qa.json']
-             
-test_file: ['data/vqa_test.json']
-answer_list: 'data/answer_list.json'
+train_file: ['D:\study\NLP\lab\project\data\annotation\vqa_train.json']
+val_file: ['D:\study\NLP\lab\project\data\annotation\vqa_val.json']
+test_file: ['D:\study\NLP\lab\project\data\annotation\vqa_test.json']
+answer_list: 'D:\study\NLP\lab\project\data\annotation\answer_list.json'
 
-vqa_root: '/export/share/datasets/vision/VQA/Images/mscoco/' #train2014/
+vqa_root: 'D:\study\NLP\lab\project\data\image\val2014' #train2014/
 vg_root: '/export/share/datasets/vision/visual-genome/'  #image/
 
 train_mindrecord: '/data/MindRecord/train.mindrecord'
