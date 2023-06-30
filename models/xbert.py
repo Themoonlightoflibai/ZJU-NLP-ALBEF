@@ -513,7 +513,7 @@ class BertConfig:
         self.vocab_size = vocab_size
         self.fusion_layer = fusion_layer
         self.encoder_width = encoder_width
-    def from_pretrained(self, config):
+    def from_json_file(self, config):
         bert_config = json.load(open(config, 'r'))
         self.architectures = bert_config['architectures']
         self.attention_probs_dropout_prob = bert_config['attention_probs_dropout_prob']
