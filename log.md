@@ -22,3 +22,8 @@ from timm.models.layers import trunc_normal_, DropPath中，DropPath可以直接
 from timm.models.vision_transformer import _cfg, PatchEmbed中，_cfg可以复制代码平替，PatchEmbed也可以平替
 
 这样第一个模型的问题就解决了
+第二个也已经找到平替
+# 待补充内容
+1. 训练函数保存预训练权重
+2. 测试函数加载模型权重
+3. 优化器和学习率可进一步提供更多选项
