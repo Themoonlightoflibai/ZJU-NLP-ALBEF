@@ -36,7 +36,6 @@ import logging
 
 
 def train(model, train_loader, eval_loader, epochs, config):
-    #需要添加保存模型预训练权重的功能
     dataset = train_loader
     dataset_size = dataset.get_dataset_size()
 
@@ -61,7 +60,7 @@ def train(model, train_loader, eval_loader, epochs, config):
 
 
 def test(model,test_loader, epochs, config):
-    #此函数还需要完善加载预训练权重的功能，并根据预训练的权重来计算精确度
+
     dataset = test_loader
     dataset_size = dataset.get_dataset_size()
 
