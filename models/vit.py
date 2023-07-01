@@ -46,12 +46,14 @@ class Attention(nn.Cell):
 
     def save_attn_gradients(self, attn_gradients):
         self.attn_gradients = attn_gradients
+        return
 
     def get_attn_gradients(self):
         return self.attn_gradients
 
     def save_attention_map(self, attention_map):
         self.attention_map = attention_map
+        return
 
     def get_attention_map(self):
         return self.attention_map
@@ -66,9 +68,11 @@ class Attention(nn.Cell):
         attn = attn.softmax(axis=-1)
         attn = self.attn_drop(attn)
 
+        '''
         if register_hook:
             self.save_attention_map(attn)
             attn.register_hook(self.save_attn_gradients)
+        '''
 
         x = (attn @ v).swapaxes(1, 2).reshape(B, N, C)
         x = self.proj(x)
@@ -191,7 +195,7 @@ class VisionTransformer(nn.Cell):
         x = self.pos_drop(x)
 
         for i, blk in enumerate(self.blocks):
-            x = blk(x, register_blk == i)
+            x = blk(x, False)
         x = self.norm(x)
 
         return x

@@ -455,13 +455,17 @@ class BertLMHeadModel(nn.Cell):
             return_dict=return_dict
         )
 
-        sequence_output = outputs[0]
+        sequence_output = outputs['last_hidden_state']
+        
+        #assert 1!=2, print(sequence_output)
+        
         prediction_scores = self.cls(sequence_output)
 
         if return_logits:
             return prediction_scores[:, :-1, :].contiguous()
-
+        
         lm_loss = None
+        shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
         if labels is not None:
             # we are doing next-token prediction; shift prediction scores and input ids by one
             shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
@@ -469,22 +473,23 @@ class BertLMHeadModel(nn.Cell):
             loss_fct = CrossEntropyLoss(reduction=reduction)
             lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
             lm_loss = lm_loss.view(prediction_scores.size(0), -1).sum(1)
-
+            
+        '''
         if soft_labels is not None:
-            loss_distill = -ops.sum(ops.log_softmax(shifted_prediction_scores, axis=-1) * soft_labels, dim=-1)
+            loss_distill = -ops.sum(ops.log_softmax(shifted_prediction_scores, axis=-1) * soft_labels, dim=None)
             loss_distill = (loss_distill * (labels != -100)).sum(1)
             lm_loss = (1 - alpha) * lm_loss + alpha * loss_distill
-
+        '''
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]
             return ((lm_loss,) + output) if lm_loss is not None else output
         return {
             'loss': lm_loss,
             'logits': prediction_scores,
-            'past_key_values': outputs.past_key_values,
-            'hidden_states': outputs.hidden_states,
-            'attentions': outputs.attentions,
-            'cross_attentions': outputs.cross_attentions,
+            'past_key_values': outputs['past_key_values'],
+            'hidden_states': outputs['hidden_states'],
+            'attentions': outputs['attentions'],
+            'cross_attentions': outputs['cross_attentions'],
         }
 
 

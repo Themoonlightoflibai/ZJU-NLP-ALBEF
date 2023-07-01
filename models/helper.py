@@ -37,6 +37,7 @@ to_ntuple = _ntuple
 
 def _assert(condition: bool, message: str):
     assert condition, message
+    return
 
 
 def nchw_to(x: mindspore.Tensor, fmt: Format):

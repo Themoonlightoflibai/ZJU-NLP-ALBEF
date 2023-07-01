@@ -48,7 +48,7 @@ class ALBEF(nn.Cell):
             self.copy_params()
             self.momentum = 0.995
 
-    def construct(self, image, question, answer=None, alpha=0, k=None, weights=None, train=True):
+    def construct(self, image, question, answer=None, alpha=0, k=None, weights=None, train=True, tokenizer = None):
         
         #此处读入的answer和weights是字符串的形式，转换成为原来的格式
         answer = answer.split(' ')
@@ -63,8 +63,8 @@ class ALBEF(nn.Cell):
         
         
         #用tokenizer做处理
-        question = tokenizer(question, padding='longest', truncation=True, max_length=25, return_tensors="pt")
-        answer = tokenizer(answer, padding='longest', return_tensors="pt").to(device) 
+        question = self.tokenizer(question, padding='longest', truncation=True, max_length=25, return_tensors="pt")
+        answer = self.tokenizer(answer, padding='longest', return_tensors="pt") 
         
         #将数据转成ms的tensor
         
@@ -83,7 +83,7 @@ class ALBEF(nn.Cell):
                                                 attention_mask=question.attention_mask,
                                                 encoder_hidden_states=image_embeds,
                                                 encoder_attention_mask=image_atts,
-                                                return_dict=True)
+                                                return_dict=True)   
 
             question_states = []
             question_atts = []
@@ -122,7 +122,7 @@ class ALBEF(nn.Cell):
                                                   encoder_attention_mask=question_atts,
                                                   labels=answer_targets,
                                                   return_dict=True,
-                                                  soft_labels=F.softmax(logits_m, dim=-1),
+                                                  soft_labels=ops.softmax(logits_m, axis =-1),
                                                   alpha=alpha,
                                                   reduction='none',
                                                   )
@@ -158,11 +158,13 @@ class ALBEF(nn.Cell):
                 param_m = param.data.copy()
                 # mindspore框架无此参数
                 #param_m.requires_grad = False  # not update by gradient
+        return
 
     def _momentum_update(self):
         for model_pair in self.model_pairs:
             for param, param_m in zip(model_pair[0].get_parameters(), model_pair[1].get_parameters()):
-                param_m.data = param_m.data * self.momentum + param.data * (1. - self.momentum)
+                param_m = (param_m.data * self.momentum + param.data * (1. - self.momentum)).copy()
+        return
 
     def rank_answer(self, question_states, question_atts, answer_ids, answer_atts, k):
 
