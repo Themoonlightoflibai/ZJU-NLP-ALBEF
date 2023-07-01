@@ -39,3 +39,4 @@ def create_dataset(dataset, config):
         return train_dataset, vqa_test_dataset
 
     return None
+def create_vqa_dataset()

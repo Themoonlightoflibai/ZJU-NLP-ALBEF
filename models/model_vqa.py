@@ -22,8 +22,9 @@ class ALBEF(nn.Cell):
         self.distill = config['distill']
         self.visual_encoder = VisionTransformer(
             img_size=config['image_res'], patch_size=16, embed_dim=768, depth=12, num_heads=12,
-            mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6))
-
+            mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, epsilon =1e-6), drop_path_rate=0.5, drop_rate=0.5)
+        import pdb
+        pdb.set_trace()
         config_encoder = BertConfig.from_json_file(config['bert_config'])
         self.text_encoder = BertModel(config=config_encoder)
 
@@ -35,7 +36,7 @@ class ALBEF(nn.Cell):
         if self.distill:
             self.visual_encoder_m = VisionTransformer(
                 img_size=config['image_res'], patch_size=16, embed_dim=768, depth=12, num_heads=12,
-                mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6))
+                mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.5, drop_rate=0.5)
             self.text_encoder_m = BertModel(config=config_encoder)
             self.text_decoder_m = BertLMHeadModel(config=config_decoder)
             self.model_pairs = [[self.visual_encoder,self.visual_encoder_m],
@@ -45,8 +46,22 @@ class ALBEF(nn.Cell):
             self.copy_params()
             self.momentum = 0.995
 
-    def construct(self, image, quesiton, answer=None, alpha=0, k=None, weights=None, train=True):
-
+    def construct(self, image, question, answer=None, alpha=0, k=None, weights=None, train=True):
+        
+        #此处读入的answer和weights是字符串的形式，转换成为原来的格式
+        answer = answer.split(' ')
+        answer = answer[:-1]
+        
+        weights = weights.split(' ')
+        weights = weights[:-1]
+        for i in range(len(weight)):
+            weights[i]=float(weights[i])
+        
+        #用tokenizer做处理
+        question = tokenizer(question, padding='longest', truncation=True, max_length=25, return_tensors="pt")
+        answer = tokenizer(answer, padding='longest', return_tensors="pt").to(device) 
+        #将数据转成ms的tensor
+        
         image_embeds = self.visual_encoder(image)
         # 也可以是mindspore.int64
         image_atts = ops.ones(image_embeds.size()[:-1], dtype=mindspore.long)
@@ -58,8 +73,8 @@ class ALBEF(nn.Cell):
             '''
             answer_targets = answer.input_ids.masked_fill(answer.input_ids == self.tokenizer.pad_token_id, -100)
 
-            question_output = self.text_encoder(quesiton.input_ids,
-                                                attention_mask=quesiton.attention_mask,
+            question_output = self.text_encoder(question.input_ids,
+                                                attention_mask=question.attention_mask,
                                                 encoder_hidden_states=image_embeds,
                                                 encoder_attention_mask=image_atts,
                                                 return_dict=True)
@@ -68,7 +83,7 @@ class ALBEF(nn.Cell):
             question_atts = []
             for b, n in enumerate(k):
                 question_states += [question_output.last_hidden_state[b]] * n
-                question_atts += [quesiton.attention_mask[b]] * n
+                question_atts += [question.attention_mask[b]] * n
             question_states = ops.stack(question_states, 0)
             question_atts = ops.stack(question_atts, 0)
 
@@ -77,8 +92,8 @@ class ALBEF(nn.Cell):
                 #with torch.no_grad():
                 self._momentum_update()
                 image_embeds_m = self.visual_encoder_m(image)
-                question_output_m = self.text_encoder_m(quesiton.input_ids,
-                                                            attention_mask=quesiton.attention_mask,
+                question_output_m = self.text_encoder_m(question.input_ids,
+                                                            attention_mask=question.attention_mask,
                                                             encoder_hidden_states=image_embeds_m,
                                                             encoder_attention_mask=image_atts,
                                                             return_dict=True)
@@ -121,12 +136,12 @@ class ALBEF(nn.Cell):
 
 
         else:
-            question_output = self.text_encoder(quesiton.input_ids,
-                                                attention_mask=quesiton.attention_mask,
+            question_output = self.text_encoder(question.input_ids,
+                                                attention_mask=question.attention_mask,
                                                 encoder_hidden_states=image_embeds,
                                                 encoder_attention_mask=image_atts,
                                                 return_dict=True)
-            topk_ids, topk_probs = self.rank_answer(question_output.last_hidden_state, quesiton.attention_mask,
+            topk_ids, topk_probs = self.rank_answer(question_output.last_hidden_state, question.attention_mask,
                                                     answer.input_ids, answer.attention_mask, k)
             return topk_ids, topk_probs
 

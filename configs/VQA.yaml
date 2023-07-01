@@ -6,11 +6,20 @@ answer_list: 'D:\study\NLP\lab\project\data\annotation\answer_list.json'
 vqa_root: 'D:\study\NLP\lab\project\data\image\val2014' #train2014/
 vg_root: '/export/share/datasets/vision/visual-genome/'  #image/
 
-train_mindrecord: '/data/MindRecord/train.mindrecord'
-val_mindrecord: '/data/MindRecord/val.mindrecord'
-test_mindrecord: '/data/MindRecord/test.mindrecord'
+image_path: '/home/ma-user/work/project/data/image/tinydataset'
 
-mindrecord_path: './data/MindRecord'
+train_image_path: '/home/ma-user/work/project/data/image/tinydataset/train2014/train2014tiny'
+test_image_path: '/home/ma-user/work/project/data/image/tinydataset/test2014/test2014tiny'
+
+train_json: 'tinytrain.json'
+val_json: 'tinyval.json'
+test_json: 'tinytest.json'
+
+train_mindrecord: '/home/ma-user/work/project/data/MindRecord/train.mindrecord'
+val_mindrecord: '/home/ma-user/work/project/data/MindRecord/val.mindrecord'
+test_mindrecord: '/home/ma-user/work/project/data/MindRecord/test.mindrecord'
+
+mindrecord_path: '/home/ma-user/work/project/data/MindRecord'
 
 image_res: 384
 batch_size_train: 32 

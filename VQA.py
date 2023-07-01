@@ -1,6 +1,6 @@
 import argparse
 import os
-import ruamel_yaml as yaml
+import ruamel.yaml as yaml
 import numpy as np
 import random
 import time
@@ -13,7 +13,7 @@ import mindspore.common.dtype as mstype
 from mindspore import context, Tensor
 from mindspore.nn import Momentum
 from mindspore.common import set_seed
-from utils.config import config
+#from utils.config import config
 from utils.lr_schedule import dynamic_lr
 from mindspore.train import LossMonitor, TimeMonitor
 from mindspore.nn.loss import SoftmaxCrossEntropyWithLogits
@@ -22,12 +22,12 @@ from mindspore.train.model import Model
 
 from models.model_vqa import ALBEF
 from models.vit import interpolate_pos_embed
-from models.tokenization_bert import BertTokenizer
+#from models.tokenization_bert import BertTokenizer
 
-from dataset import create_vqa_dataset
+from Minddataset import create_vqa_dataset
 
-from scheduler import create_scheduler
-from optim import create_optimizer
+#from scheduler import create_scheduler
+#from optim import create_optimizer
 
 
 def train(model, train_loader, eval_loader, epochs, config):
@@ -88,15 +88,19 @@ def main(args, config):
 
     # 根据mindrecord创建数据集
     print("Creating vqa dataset according to MindRecord")
-
-    train_dataset, val_datset = create_vqa_dataset(config, config.batch_size_train, repeat_num=1, device_num=1,
-                                                   rank_id=1,
-                                                   is_training=True, num_parallel_workers=6, is_tiny=args.tiny)
-    test_dataset = create_vqa_dataset(config, config.batch_size_train, repeat_num=1, device_num=1, rank_id=1,
-                                      is_training=False, num_parallel_workers=6, is_tiny=args.tiny)
+    
+    train_dataset, val_datset = create_vqa_dataset(config, config['batch_size_train'], repeat_num=1, device_num=1,rank_id=0, is_training=True, num_parallel_workers=6, is_tiny=args.tiny)
+    test_dataset = create_vqa_dataset(config, config['batch_size_test'], repeat_num=1, device_num=1, rank_id=0, is_training=False, num_parallel_workers=6, is_tiny=args.tiny)
 
     # 构造模型
-    tokenizer = BertTokenizer(args.text_encoder)
+    print("BUILDING ALBEF MODEL")
+    
+    '''
+    配置完环境后更改为BertTokenizer
+    tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
+    '''
+    tokenizer=None
+    
     model = ALBEF(config=config, text_encoder=args.text_encoder, text_decoder=args.text_decoder, tokenizer=tokenizer)
 
     # 模型训练
@@ -121,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--world_size', default=1, type=int, help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--distributed', default=False, type=bool)
-    parser.add_argument('--tiny', default=True, type=bool)
+    parser.add_argument('--tiny', default=False, type=bool)
     parser.add_argument('--is_training', default=True, type=bool)
     args = parser.parse_args()
 

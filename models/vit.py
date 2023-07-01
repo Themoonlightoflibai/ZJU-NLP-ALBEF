@@ -4,20 +4,21 @@ import mindspore.nn as nn
 import mindspore.ops as ops
 from mindspore import Parameter, Tensor
 from functools import partial
-from helper import PatchEmbed, trunc_normal_, DropPath
+from .helper import PatchEmbed, trunc_normal_, DropPath
 
 
-class Mlp(nn.cell):
+class Mlp(nn.Cell):
     """ MLP as used in Vision Transformer, MLP-Mixer and related networks
     """
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU(approximate=False), drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
+        
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         self.fc1 = nn.Dense(in_features, hidden_features)
-        self.act = act_layer()
+        self.act = nn.GELU(approximate=False)
         self.fc2 = nn.Dense(hidden_features, out_features)
-        self.drop = nn.Dropout(p=drop)
+        self.drop = nn.Dropout(1 - drop)
 
     def construct(self, x):
         x = self.fc1(x)
@@ -28,17 +29,18 @@ class Mlp(nn.cell):
         return x
 
 
-class Attention(nn.cell):
+class Attention(nn.Cell):
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
+        
         self.num_heads = num_heads
         head_dim = dim // num_heads
         # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
         self.scale = qk_scale or head_dim ** -0.5
         self.qkv = nn.Dense(dim, dim * 3, has_bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
+        self.attn_drop = nn.Dropout(1 - attn_drop)
         self.proj = nn.Dense(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
+        self.proj_drop = nn.Dropout(1 - proj_drop)
         self.attn_gradients = None
         self.attention_map = None
 
@@ -54,7 +56,7 @@ class Attention(nn.cell):
     def get_attention_map(self):
         return self.attention_map
 
-    def forward(self, x, register_hook=False):
+    def construct(self, x, register_hook=False):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
@@ -74,27 +76,28 @@ class Attention(nn.cell):
         return x
 
 
-class Block(nn.cell):
+class Block(nn.Cell):
 
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU(approximate=False), norm_layer=nn.LayerNorm):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        self.norm1 = norm_layer([dim])
+        
         self.attn = Attention(
             dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = norm_layer(dim)
+        self.norm2 = norm_layer([dim])
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
-    def forward(self, x, register_hook=False):
+    def construct(self, x, register_hook=False):
         x = x + self.drop_path(self.attn(self.norm1(x), register_hook=register_hook))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
 
-class VisionTransformer(nn.cell):
+class VisionTransformer(nn.Cell):
     """ Vision Transformer
     A PyTorch impl of : `An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale`  -
         https://arxiv.org/abs/2010.11929
@@ -122,28 +125,30 @@ class VisionTransformer(nn.cell):
             norm_layer: (nn.Module): normalization layer
         """
         super().__init__()
+        
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
-        norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
+        norm_layer = norm_layer or partial(nn.LayerNorm, epsilon =1e-6)
 
-        self.patch_embed = PatchEmbed(
-            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+        self.patch_embed = PatchEmbed(img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
         # 此部分差异见官方文档
-        self.cls_token = Parameter(ops.zeros((1, 1, embed_dim)))
-        self.pos_embed = Parameter(ops.zeros((1, num_patches + 1, embed_dim)))
-        self.pos_drop = nn.Dropout(p=drop_rate)
-
-        dpr = [x.item() for x in ops.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
+        self.cls_token = Parameter(ops.zeros((1, 1, embed_dim), mindspore.float32))
+        self.pos_embed = Parameter(ops.zeros((1, num_patches + 1, embed_dim), mindspore.float32))
+        self.pos_drop = nn.Dropout(keep_prob=1-drop_rate)
+        dpr = [x for x in ops.linspace(Tensor(0, mindspore.float32), Tensor(drop_path_rate, mindspore.float32), depth)]  # stochastic depth decay rule
+        
         self.blocks = nn.CellList([
             Block(
                 dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
                 drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(depth)])
-        self.norm = norm_layer(embed_dim)
+        
+        self.norm = norm_layer([embed_dim])
 
-        trunc_normal_(self.pos_embed, std=.02)
-        trunc_normal_(self.cls_token, std=.02)
-        self.apply(self._init_weights)
+        self.pos_embed = trunc_normal_(self.pos_embed, std=.02)
+        self.cls_token = trunc_normal_(self.cls_token, std=.02)
+        
+        self.apply = (self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Dense):
@@ -169,7 +174,7 @@ class VisionTransformer(nn.cell):
         return {'pos_embed', 'cls_token'}
     '''
 
-    def forward(self, x, register_blk=-1):
+    def construct(self, x, register_blk=-1):
         B = x.shape[0]
         x = self.patch_embed(x)
 

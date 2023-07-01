@@ -288,7 +288,7 @@ class BertLMPredictionHead(nn.Cell):
         return hidden_states
 
 
-class BertOnlyMLMHead(nn.Module):
+class BertOnlyMLMHead(nn.Cell):
     def __init__(self, config):
         super().__init__()
         self.predictions = BertLMPredictionHead(config)
@@ -298,7 +298,7 @@ class BertOnlyMLMHead(nn.Module):
         return prediction_scores
 
 
-class BertOnlyNSPHead(nn.Module):
+class BertOnlyNSPHead(nn.Cell):
     def __init__(self, config):
         super().__init__()
         self.seq_relationship = nn.Dense(config.hidden_size, 2)
