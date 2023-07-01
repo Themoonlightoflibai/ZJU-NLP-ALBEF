@@ -8,7 +8,7 @@ import mindspore.ops as ops
 from mindspore import Parameter, Tensor
 
 import numpy as np
-
+import pdb
 
 class ALBEF(nn.Cell):
     def __init__(self,
@@ -23,12 +23,14 @@ class ALBEF(nn.Cell):
         self.visual_encoder = VisionTransformer(
             img_size=config['image_res'], patch_size=16, embed_dim=768, depth=12, num_heads=12,
             mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, epsilon =1e-6), drop_path_rate=0.5, drop_rate=0.5)
-        import pdb
-        pdb.set_trace()
-        config_encoder = BertConfig.from_json_file(config['bert_config'])
+        
+        bertconfig_encoder = BertConfig()
+        config_encoder = bertconfig_encoder.from_json_file(config['bert_config'])
         self.text_encoder = BertModel(config=config_encoder)
-
-        config_decoder = BertConfig.from_json_file(config['bert_config'])
+        
+        
+        bertconfig_decoder = BertConfig()
+        config_decoder = bertconfig_decoder.from_json_file(config['bert_config'])
         config_decoder.fusion_layer = 0
         config_decoder.num_hidden_layers = 6
         self.text_decoder = BertLMHeadModel(config=config_decoder)
@@ -36,7 +38,7 @@ class ALBEF(nn.Cell):
         if self.distill:
             self.visual_encoder_m = VisionTransformer(
                 img_size=config['image_res'], patch_size=16, embed_dim=768, depth=12, num_heads=12,
-                mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.5, drop_rate=0.5)
+                mlp_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, epsilon=1e-6), drop_path_rate=0.5, drop_rate=0.5)
             self.text_encoder_m = BertModel(config=config_encoder)
             self.text_decoder_m = BertLMHeadModel(config=config_decoder)
             self.model_pairs = [[self.visual_encoder,self.visual_encoder_m],
@@ -54,12 +56,16 @@ class ALBEF(nn.Cell):
         
         weights = weights.split(' ')
         weights = weights[:-1]
-        for i in range(len(weight)):
+        
+        
+        for i in range(len(weights)):
             weights[i]=float(weights[i])
+        
         
         #用tokenizer做处理
         question = tokenizer(question, padding='longest', truncation=True, max_length=25, return_tensors="pt")
         answer = tokenizer(answer, padding='longest', return_tensors="pt").to(device) 
+        
         #将数据转成ms的tensor
         
         image_embeds = self.visual_encoder(image)
@@ -148,8 +154,9 @@ class ALBEF(nn.Cell):
     def copy_params(self):
         for model_pair in self.model_pairs:
             for param, param_m in zip(model_pair[0].get_parameters(), model_pair[1].get_parameters()):
-                param_m.data.copy(param.data)  # initialize
-                # mindspore框架巫此参数
+                #param_m.data.copy(param.data)  # initialize
+                param_m = param.data.copy()
+                # mindspore框架无此参数
                 #param_m.requires_grad = False  # not update by gradient
 
     def _momentum_update(self):

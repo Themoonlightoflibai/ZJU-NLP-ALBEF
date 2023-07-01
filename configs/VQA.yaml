@@ -31,8 +31,7 @@ distill: True
 warm_up: True
 
 eos: '[SEP]'
-
-bert_config: 'configs/config_bert.json'
+bert_config: '/home/ma-user/work/project/code/ZJU-NLP-ALBEF/configs/config_bert.json'
 
 base_lr: 2e-5
 warmup_ratio: 0.4

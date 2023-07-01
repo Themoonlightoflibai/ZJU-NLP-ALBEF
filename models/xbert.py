@@ -416,9 +416,21 @@ class BertLMHeadModel(nn.Cell):
 
         self.cls = BertOnlyMLMHead(config)
 
-        # 此处需要补全
-        self.init_weights()
-
+        #self.init_weights()
+        
+    def init_weights(self, module):
+        """ Initialize the weights """
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            # Slightly different from the TF version which uses truncated_normal for initialization
+            # cf https://github.com/pytorch/pytorch/pull/5617
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+        if isinstance(module, nn.Linear) and module.bias is not None:
+            module.bias.data.zero_()
+            
+    
     def construct(self,
                   input_ids,
                   attention_mask=None,
@@ -513,8 +525,15 @@ class BertConfig:
         self.vocab_size = vocab_size
         self.fusion_layer = fusion_layer
         self.encoder_width = encoder_width
+        self.output_attentions = True
+        self.output_hidden_states = True
+        
+        
+        
     def from_json_file(self, config):
-        bert_config = json.load(open(config, 'r'))
+        with open(config, 'r') as file:
+            # 解析JSON数据
+            bert_config = json.load(file)
         self.architectures = bert_config['architectures']
         self.attention_probs_dropout_prob = bert_config['attention_probs_dropout_prob']
         self.hidden_act = bert_config['hidden_act']
@@ -532,4 +551,5 @@ class BertConfig:
         self.vocab_size = bert_config['vocab_size']
         self.fusion_layer = bert_config['fusion_layer']
         self.encoder_width = bert_config['encoder_width']
+        return self
 

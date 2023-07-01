@@ -18,16 +18,21 @@ from utils.lr_schedule import dynamic_lr
 from mindspore.train import LossMonitor, TimeMonitor
 from mindspore.nn.loss import SoftmaxCrossEntropyWithLogits
 from mindspore import amp, nn
-from mindspore.train.model import Model
+from mindspore.amp import FixedLossScaleManager
+from mindspore import Model
 
 from models.model_vqa import ALBEF
 from models.vit import interpolate_pos_embed
-#from models.tokenization_bert import BertTokenizer
+from models.tokenization_bert import BertTokenizer
 
 from Minddataset import create_vqa_dataset
 
 #from scheduler import create_scheduler
 #from optim import create_optimizer
+
+import requests
+import logging
+
 
 
 def train(model, train_loader, eval_loader, epochs, config):
@@ -37,15 +42,16 @@ def train(model, train_loader, eval_loader, epochs, config):
 
     # 定义学习率
     lr = Tensor(dynamic_lr(config, dataset_size), mstype.float32)
-    opt = Momentum(params=model.trainable_params(), learning_rate=lr, momentum=config.momentum, \
-                   weight_decay=config.weight_decay)
+    opt = Momentum(params=model.trainable_params(), learning_rate=lr, momentum=config['momentum'], \
+                   weight_decay=config['weight_decay'])
 
-    loss_scale = amp.FixedLossScaleManager(config.loss_scale, drop_overflow_update=False)
+    loss_scale = FixedLossScaleManager(config['loss_scale'], drop_overflow_update=False)
+    
+    
+    model = Model(model, loss_fn=None, optimizer=opt, loss_scale_manager=loss_scale,
+                  amp_level="O3", keep_batchnorm_fp32=False)
 
-    model = Model(model, loss_fn=None, optimizer=opt, loss_scale_manager=loss_scale, metrics={'acc'},
-                  amp_level="O2", keep_batchnorm_fp32=False)
-
-    time_cb = TimeMonitor(data_size=config.step_size)
+    time_cb = TimeMonitor(data_size=config['step_size'])
     loss_cb = LossMonitor()
     cb = [time_cb, loss_cb]
     print("begin training...")
@@ -64,7 +70,7 @@ def test(model,test_loader, epochs, config):
     opt = Momentum(params=model.trainable_params(), learning_rate=lr, momentum=config.momentum, \
                    weight_decay=config.weight_decay)
 
-    loss_scale = amp.FixedLossScaleManager(config.loss_scale, drop_overflow_update=False)
+    loss_scale = FixedLossScaleManager(config.loss_scale, drop_overflow_update=False)
 
     model = Model(model, loss_fn=None, optimizer=opt, loss_scale_manager=loss_scale, metrics={'acc'},
                   amp_level="O2", keep_batchnorm_fp32=False)
@@ -95,14 +101,12 @@ def main(args, config):
     # 构造模型
     print("BUILDING ALBEF MODEL")
     
-    '''
-    配置完环境后更改为BertTokenizer
-    tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
-    '''
-    tokenizer=None
     
+    #huggingface 经常连接不上
+    tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
+    
+    tokenizer = None
     model = ALBEF(config=config, text_encoder=args.text_encoder, text_decoder=args.text_decoder, tokenizer=tokenizer)
-
     # 模型训练
     if args.is_training:
         train(model, train_dataset, val_datset, max_epoch, config)
@@ -113,12 +117,16 @@ def main(args, config):
 
 
 if __name__ == '__main__':
+    
+    #设置运行环境
+    context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='./configs/VQA.yaml')
     parser.add_argument('--checkpoint', default='')
     parser.add_argument('--output_dir', default='output/vqa')
     parser.add_argument('--evaluate', action='store_true')
-    parser.add_argument('--text_encoder', default='bert-base-uncased')
+    parser.add_argument('--text_encoder', default='./Bert_pretrain/')
     parser.add_argument('--text_decoder', default='bert-base-uncased')
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--seed', default=42, type=int)
@@ -137,5 +145,6 @@ if __name__ == '__main__':
     Path(args.result_dir).mkdir(parents=True, exist_ok=True)
 
     yaml.dump(config, open(os.path.join(args.output_dir, 'config.yaml'), 'w'))
+    
 
     main(args, config)
